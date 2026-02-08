@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智商税检测器 v5.1 | 毒舌交互版</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #10B981;       /* 理性绿 */
+            --primary-dark: #059669;
+            --bg-body: #F3F4F6;
+            --bg-card: #FFFFFF;
+            --text-main: #1F2937;
+            --text-sub: #6B7280;
+            --danger: #EF4444;        /* 警示红 */
+            --warning: #F59E0B;
+            --radius: 16px;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* === 核心容器 === */
+        .quiz-container {
+            width: 100%;
+            max-width: 650px;
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            padding: 30px;
+            position: relative;
+            z-index: 10;
+            margin-bottom: 40px;
+            border-top: 6px solid var(--primary);
+            overflow: hidden;
+        }
+
+        h1 { color: var(--primary-dark); text-align: center; margin: 0 0 10px 0; }
+        .subtitle { color: var(--text-sub); text-align: center; margin-bottom: 30px; font-size: 0.9rem; }
+
+        /* 输入框 */
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.9rem; }
+        input, select {
+            width: 100%; padding: 12px; border: 2px solid #E5E7EB; border-radius: 10px;
+            font-size: 1rem; box-sizing: border-box; transition: 0.3s;
+        }
+        input:focus { border-color: var(--primary); outline: none; }
+
+        /* 按钮 */
+        .btn {
+            width: 100%; padding: 15px; border: none; border-radius: 12px;
+            font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); }
+        .btn-primary:hover { transform: translateY(-2px); background: var(--primary-dark); }
+        
+        .btn-option {
+            background: #fff; border: 2px solid #E5E7EB; color: var(--text-main);
+            margin-bottom: 12px; text-align: left; padding: 16px; line-height: 1.5; font-weight: 500;
+            justify-content: flex-start;
+        }
+        .btn-option:hover { border-color: var(--primary); background: #ECFDF5; color: var(--primary-dark); }
+
+        /* 知识卡片 (详情与案例) */
+        .knowledge-box {
+            background: #F9FAFB;
+            border-left: 4px solid #3B82F6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
+            color: #4B5563;
+        }
+        .knowledge-summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: #2563EB;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 5px;
+        }
+        .knowledge-content {
+            margin-top: 10px;
+            line-height: 1.6;
+            display: block; /* 默认展开 */
+            animation: fadeIn 0.3s;
+        }
+        .knowledge-content.collapsed { display: none; } /* 折叠状态 */
+        
+        .case-tag {
+            background: #E5E7EB; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; margin-right: 5px; color: #374151;
+        }
+
+        /* 毒舌弹窗 (Overlay) */
+        .critique-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s;
+            padding: 40px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .critique-overlay.active { opacity: 1; pointer-events: all; }
+        
+        .critique-icon { font-size: 4rem; margin-bottom: 20px; animation: shake 0.5s; }
+        .critique-title { font-size: 1.5rem; color: #FCA5A5; margin-bottom: 15px; font-weight: bold; }
+        .critique-text { font-size: 1.1rem; line-height: 1.6; margin-bottom: 30px; color: #fff; font-style: italic; }
+        
+        .btn-ouch {
+            background: transparent; border: 2px solid #fff; color: #fff; width: auto; padding: 10px 30px;
+        }
+        .btn-ouch:hover { background: #fff; color: #000; }
+
+        @keyframes shake {
+            0% { transform: rotate(0deg); } 25% { transform: rotate(5deg); } 
+            50% { transform: rotate(0deg); } 75% { transform: rotate(-5deg); } 100% { transform: rotate(0deg); }
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 进度条 */
+        .progress-container { height: 6px; background: #E5E7EB; border-radius: 3px; margin: 20px 0; overflow: hidden; }
+        .progress-bar { height: 100%; background: var(--primary); width: 0%; transition: width 0.4s ease; }
+        
+        /* 页面切换 */
+        .screen { display: none; opacity: 0; animation: fadeUp 0.5s forwards; }
+        .screen.active { display: block; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* PDF 隐藏区 */
+        #pdf-content { display: none; }
+        .pdf-visible { display: block !important; padding: 40px; background: white; color: black; }
+
+        /* 结果页 */
+        .score-display { font-size: 5rem; font-weight: 800; color: var(--primary); margin: 10px 0; line-height: 1; }
+    </style>
+</head>
+<body>
+
+<div class="quiz-container">
+    
+    <div id="screen-setup" class="screen active">
+        <h1>🔍 智商税检测器</h1>
+        <p class="subtitle">行为经济学版 · 默认开启理论辅助</p>
+        
+        <div class="input-group">
+            <label>🛍️ 想买什么？</label>
+            <input type="text" id="itemName" placeholder="例如：Sony A7M4">
+        </div>
+        <div class="input-group">
+            <label>💰 价格 (¥)</label>
+            <input type="number" id="itemPrice" placeholder="8999">
+        </div>
+        <div class="input-group">
+            <label>💼 月薪 (¥)</label>
+            <input type="number" id="monthlySalary" placeholder="用于计算生命时间">
+        </div>
+
+        <button class="btn btn-primary" onclick="startGame()">开始拷问</button>
+    </div>
+
+    <div id="screen-quiz" class="screen">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="background:#E5E7EB; padding:4px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#4B5563;" id="dimension-tag">维度一</span>
+            <span style="color:#9CA3AF; font-size:0.9rem;">第 <span id="current-q-num">1</span>/20 题</span>
+        </div>
+        
+        <div class="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        
+        <h3 id="question-text" style="font-size:1.2rem; margin-bottom:15px; min-height:50px;">问题加载中...</h3>
+
+        <div class="knowledge-box">
+            <div class="knowledge-summary" onclick="toggleKnowledge()">
+                <span><i class="fas fa-lightbulb"></i> 参考理论与案例</span>
+                <i class="fas fa-chevron-up" id="toggle-icon" style="font-size:0.8rem;"></i>
+            </div>
+            <div class="knowledge-content" id="knowledge-content">
+                </div>
+        </div>
+        
+        <div id="options-container">
+            </div>
+
+        <div id="critique-overlay" class="critique-overlay">
+            <div class="critique-icon">🤡</div>
+            <div class="critique-title">警报：智商税预警</div>
+            <div class="critique-text" id="overlay-text"></div>
+            <button class="btn btn-ouch" onclick="closeCritique()">扎心了，下一题</button>
+        </div>
+    </div>
+
+    <div id="screen-result" class="screen" style="text-align: center;">
+        <p style="color:#6B7280; margin-bottom:0;">最终理性得分</p>
+        <div class="score-display" id="final-score">0</div>
+        <h2 id="final-verdict"></h2>
+        <div id="final-advice" style="background:#F9FAFB; padding:20px; border-radius:12px; text-align:left; margin-bottom:20px; font-size:0.95rem; line-height:1.6;"></div>
+        
+        <button class="btn btn-primary" onclick="downloadPDF()">下载详细审计报告 (PDF)</button>
+        <button class="btn" style="background:transparent; color:#6B7280; margin-top:10px;" onclick="location.reload()">再测一次</button>
+    </div>
+</div>
+
+<div style="max-width:500px; margin:0 auto; text-align:center; opacity:0.8;">
+    <p style="font-size:0.85rem; color:#6B7280;">如果这个工具骂醒了你，可以请作者喝杯冰美式 👇</p>
+    <div style="width:120px; height:120px; background:#ddd; margin:10px auto; display:flex; align-items:center; justify-content:center; border-radius:10px;">
+        <i class="fas fa-qrcode" style="font-size:2rem; color:#999;"></i>
+    </div>
+</div>
+
+<div id="pdf-content">
+    <div style="border-bottom:4px solid #10B981; padding-bottom:20px; margin-bottom:20px;">
+        <h1>消费理性审计报告</h1>
+        <p>Generated by 智商税检测器 v5.1</p>
+    </div>
+    <div style="background:#F3F4F6; padding:20px; border-radius:8px; margin-bottom:20px;">
+        <p><strong>📦 商品：</strong> <span id="pdf-item"></span></p>
+        <p><strong>💰 价格：</strong> ¥<span id="pdf-price"></span></p>
+        <p><strong>⏳ 劳动力兑换：</strong> <span id="pdf-labor"></span> 小时</p>
+        <p><strong>🏆 得分：</strong> <span id="pdf-score" style="font-size:20px; font-weight:bold; color:#10B981;"></span> / 100</p>
+    </div>
+    <div style="border:1px solid #eee; padding:15px; margin-bottom:20px;">
+        <h4 id="pdf-verdict-text"></h4>
+        <p id="pdf-advice-text"></p>
+    </div>
+    <h3>灵魂拷问记录：</h3>
+    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+        <thead>
+            <tr style="background:#10B981; color:white;">
+                <th style="padding:8px;">维度</th>
+                <th style="padding:8px;">问题</th>
+                <th style="padding:8px;">你的选择 & 锐评</th>
+            </tr>
+        </thead>
+        <tbody id="pdf-table-body"></tbody>
+    </table>
+</div>
+
+<script>
+    // === 数据中心 ===
+    let state = { score: 0, currentQ: 0, answers: [], laborHours: 0 };
+    
+    // 完整 20 题库
+    const questions = [
+        // --- 维度一：效用审计 ---
+        {
+            dim: "效用审计",
+            q: "幻想自我测试：你买这个，是给‘现在的自己’用，还是给‘想象中会成为的人’用？",
+            theory: "消费者常通过购买产品来构建理想自我。但研究表明，产品本身无法创造习惯，只能辅助已有的习惯。",
+            case: "相机 vs. 手机：想买索尼A7M4，但过去一年只用手机拍了不到50张照片。相机买来只会积灰。",
+            options: [
+                { t: "A. 现在的我，这是刚需", s: 5 },
+                { t: "B. 理想的我，我想敦促自己改变", s: 0, critique: "花3万块买相机并不能让你变成摄影师，只会让你变成一个‘拥有昂贵相机的路人’。设备长不出技术，更长不出勤奋。" }
+            ]
+        },
+        {
+            dim: "效用审计",
+            q: "替代品壁垒：你是否已有能实现80%功能的替代品？为了这20%提升，值得多花10倍钱吗？",
+            theory: "边际效用递减规律。从0到1的提升巨大，但从90分到95分的提升往往伴随着指数级的成本增加。",
+            case: "iPad Pro vs 旧iPad：除了跑分，日常看剧记笔记体验无差。这多花的8000元是为‘性能过剩’买单。",
+            options: [
+                { t: "A. 没有/旧的坏了", s: 5 },
+                { t: "B. 有，但我想体验提升", s: 0, critique: "为了那个只有放大400%才能看出的噪点区别去买新设备，那是参数党的自我高潮，不是需求。" }
+            ]
+        },
+        {
+            dim: "效用审计",
+            q: "租赁测试：在购买前，你愿意先花点麻烦去租或者借用这件东西一周吗？",
+            theory: "此问题引入‘交易摩擦’。如果用户连租赁的麻烦都不愿承担，说明他们渴望的是‘购买的快感’而非‘使用权’。",
+            case: "GoPro：很多人为滑雪买GoPro，一年只用两次。如果先租，会发现剪辑极繁琐，根本不想买。",
+            options: [
+                { t: "A. 愿意/已试用", s: 5 },
+                { t: "B. 不愿意，太麻烦", s: 0, critique: "如果你连租一周试用的耐心都没有，说明你根本不在乎它好不好用，你只是想体验‘刷卡-拆快递’那15分钟的多巴胺高潮。" }
+            ]
+        },
+        {
+            dim: "效用审计",
+            q: "频率审判：未来一年内，你会用超过50次吗？如果少于10次，单次成本能接受吗？",
+            theory: "强制进行CPU（单次使用成本）计算。对于低频高价物品，共享或租赁在经济上永远优于购买。",
+            case: "家用跑步机：绝大多数最终沦为晾衣架。其使用频率远低于预期，占地成本极高。",
+            options: [
+                { t: "A. 高频使用 (>50次)", s: 5 },
+                { t: "B. 低频 (<10次)", s: 0, critique: "这件东西3000块，你就用一次。这3000块是门票费吗？租一件只要300，剩下的2700拿去吃顿好的不香吗？" }
+            ]
+        },
+        {
+            dim: "效用审计",
+            q: "30天冷静期：这个购买念头是今天才有的吗？",
+            theory: "情绪具有瞬时性。延迟满足能有效过滤掉由环境刺激（广告、促销）引发的伪需求。",
+            case: "直播间冲动单：喊着‘最后5单’，脑子一热下单空气炸锅。强制等30天，你会发现根本不做饭。",
+            options: [
+                { t: "A. 已经想了很久", s: 5 },
+                { t: "B. 今天刚被种草", s: 0, critique: "现在的‘非买不可’，大概率是商家的营销话术给你下的蛊。放30天，90%的东西你会连它们叫什么都想不起来。" }
+            ]
+        },
+        // --- 维度二：财务现实 ---
+        {
+            dim: "财务现实",
+            q: "工时换算：这东西的价格，需要你忍受老板的废话多少个小时才能赚回来？",
+            theory: "将抽象的货币具象化为痛苦的劳动时间。利用‘损失厌恶’心理，让支出痛感更真实。",
+            case: "月薪5k买iPhone Pro：售价1万意味着两个月不吃不喝的劳动。这种置换能浇灭购买欲。",
+            options: [
+                { t: "A. 值得交换", s: 5 },
+                { t: "B. 看着心疼", s: 0, critique: "也就是说，你这几个月早起贪黑、挤地铁、加班、挨骂，全是为这个商品打工。它真的配吗？" }
+            ]
+        },
+        {
+            dim: "财务现实",
+            q: "双倍支付能力：如果不分期，你的现金流能马上买两个这玩意儿而不心疼吗？",
+            theory: "源自Jay-Z理财名言。检测流动性风险。如果买一个就捉襟见肘，说明属于过度杠杆。",
+            case: "大学生买奢侈品鞋：使用分期。虽然月供轻松，但未来一年的现金流被锁定，抗风险能力归零。",
+            options: [
+                { t: "A. 轻松买两个", s: 5 },
+                { t: "B. 买一个都费劲", s: 0, critique: "别被分期免息骗了。如果买一个都要精打细算，说明你是个穷人，而这是富人的玩具。强行消费只会让你更穷。" }
+            ]
+        },
+        {
+            dim: "财务现实",
+            q: "机会成本：如果把这笔钱定投指数基金，10年后它会变成多少钱？",
+            theory: "消费是复利的敌人。将消费金额转化为潜在的投资收益，能提升决策门槛。",
+            case: "汽车首付 vs 股票：20万买车5年后值8万；20万买英伟达或指数，5年后可能翻倍。",
+            options: [
+                { t: "A. 还是它重要", s: 5 },
+                { t: "B. 存钱更好", s: 0, critique: "你买的不是表，你是在消灭未来可能变成的养老金。如果这东西不保值，那你就是双重亏损。" }
+            ]
+        },
+        {
+            dim: "财务现实",
+            q: "折旧接受度：如果出门转手就打5折，这笔钱‘蒸发’了你心疼吗？",
+            theory: "多数消费品存在‘柠檬市场’效应，离柜即贬值。需在心理上预销毁这部分价值。",
+            case: "钻戒 vs 黄金：钻戒买入3万回收3千。黄金买入3万回收还是3万。",
+            options: [
+                { t: "A. 不心疼/消耗品", s: 5 },
+                { t: "B. 心疼/指望保值", s: 0, critique: "别跟我谈什么‘保值’。除非你买的是黄金或爱马仕BKC，否则这东西就是个碎钞机。买它就是为了消耗，别指望回血。" }
+            ]
+        },
+        {
+            dim: "财务现实",
+            q: "现金二选一：如果这一堆现金放在左手，这东西放在右手，只能拿一样？",
+            theory: "消除数字支付的抽象感。物理现金的诱惑力往往大于物品。",
+            case: "年终奖：发5万现金，很多人会选择存起来或旅游，而不是换成一块表。",
+            options: [
+                { t: "A. 选东西", s: 5 },
+                { t: "B. 选现金", s: 0, critique: "看着那一叠厚厚的钞票，你可能突然觉得，旧手机其实还没那么卡，旧包包也还能背。" }
+            ]
+        },
+        // --- 维度三：心理陷阱 ---
+        {
+            dim: "心理陷阱",
+            q: "狄德罗预警：买了这个之后，为了配得上它，你还需要买多少周边配件？",
+            theory: "狄德罗效应。为了保持物品间的一致性，新物品往往迫使旧物品被淘汰。",
+            case: "露营：只买了一顶帐篷，结果发现需要天幕、蛋卷桌、营地车……最终花费是帐篷的10倍。",
+            options: [
+                { t: "A. 不需要配件", s: 5 },
+                { t: "B. 需要大换血", s: 0, critique: "为了这一碟醋，你得包顿饺子，最后破产的是包饺子的你。" }
+            ]
+        },
+        {
+            dim: "心理陷阱",
+            q: "社交隐身测试：如果这东西完全没有Logo，你还会买吗？",
+            theory: "剥离凡勃伦效应。测试物品是具有内在效用还是仅为炫耀性消费。",
+            case: "Supreme砖头：一块印Logo的红砖卖几千。如果没有Logo，它一文不值。",
+            options: [
+                { t: "A. 会，看中功能", s: 5 },
+                { t: "B. 不会了", s: 0, critique: "承认吧，你根本不在乎面料，你只在乎那个Logo能让同事高看你一眼。你是为了别人的眼光买单，这叫交‘自卑税’。" }
+            ]
+        },
+        {
+            dim: "心理陷阱",
+            q: "HALT情绪检修：你现在是不是饿了、生气、孤独或者累了？",
+            theory: "零售疗法。在认知资源耗尽或情绪低落时，前额叶控制力减弱，更容易冲动消费。",
+            case: "深夜网购：晚上11点感到孤独，疯狂下单。第二天早上醒来通常会后悔。",
+            options: [
+                { t: "A. 我很清醒", s: 5 },
+                { t: "B. 是的，状态不好", s: 0, critique: "你现在不是在购物，你是在找奶嘴。去睡一觉，去吃顿火锅。别用钱包来填补情绪的黑洞。" }
+            ]
+        },
+        {
+            dim: "心理陷阱",
+            q: "影响者免疫：在打开APP之前，你知道自己‘需要’这个东西吗？",
+            theory: "模仿欲望。我们的欲望往往是模仿他人的结果，而非源自真实需求。",
+            case: "光腿神器：网红滤镜轰炸下，所有人都觉得自己缺一条，实际穿上并不自然。",
+            options: [
+                { t: "A. 本来就需要", s: 5 },
+                { t: "B. 被种草的", s: 0, critique: "博主推荐是因为收了广告费，你买是因为你是韭菜。她用这个显得精致，你用了只能显得‘跟风’。" }
+            ]
+        },
+        {
+            dim: "心理陷阱",
+            q: "享乐跑步机：三个月后，这东西还能让你像今天这么兴奋吗？",
+            theory: "情感预测偏差。我们倾向于高估未来事件对情绪影响的强度和持续时间。",
+            case: "Kindle：买的时候觉得会博览群书，三个月后唯一的用途是盖泡面。",
+            options: [
+                { t: "A. 能，长久爱好", s: 5 },
+                { t: "B. 不确定", s: 0, critique: "新车的味道只能维持一个月，但车贷要还三年。三个月后，它就会变成角落里的灰尘收集器。" }
+            ]
+        },
+        // --- 维度四：持有成本 ---
+        {
+            dim: "持有成本",
+            q: "空间税：你家里有专门空出来的地方放它吗？按照房价算，占地值多少钱？",
+            theory: "物理空间的经济成本与心理拥堵成本。极简主义强调物品对空间的侵占。",
+            case: "大型按摩椅：占地2平米。在一线城市价值10万+。最后沦为堆衣服的椅子。",
+            options: [
+                { t: "A. 有地方", s: 5 },
+                { t: "B. 没地放", s: 0, critique: "你花几百万买的房子，是用来住人的，不是用来堆破烂的。每增加一件杂物，你的生活空间就贬值一分。" }
+            ]
+        },
+        {
+            dim: "持有成本",
+            q: "维护抵押：你准备好侍候它了吗？(干洗、保养、充电、升级)",
+            theory: "总拥有成本(TCO)。显性价格只是冰山一角，隐性维护成本往往被忽视。",
+            case: "真丝衬衫/羊皮鞋：极其难打理，穿一次就要送干洗店。维护麻烦导致低频使用。",
+            options: [
+                { t: "A. 准备好了", s: 5 },
+                { t: "B. 挺麻烦的", s: 0, critique: "你以为买的是个包，其实买了个‘爹’。你得像供佛一样供着它，累不累？" }
+            ]
+        },
+        {
+            dim: "持有成本",
+            q: "二手残值：如果下个月急需用钱，这东西好卖吗？",
+            theory: "资产流动性。好的消费品应当具有一定的流动性。",
+            case: "轻奢包袋：专柜几千买入，二手市场几百块都没人要。流动性极差。",
+            options: [
+                { t: "A. 硬通货", s: 5 },
+                { t: "B. 不好卖", s: 0, critique: "别跟我说这是投资。当你急需用钱时，它就是一堆无用的废铜烂铁。" }
+            ]
+        },
+        {
+            dim: "持有成本",
+            q: "边际效用陷阱：新款比旧款真的强很多吗？",
+            theory: "韦伯-费希纳定律。参数的提升往往感知不强，但价格差异巨大。",
+            case: "手机年年换：对于只刷微信抖音的用户，iPhone 13和15体验差异微乎其微。",
+            options: [
+                { t: "A. 质的飞跃", s: 5 },
+                { t: "B. 微小升级", s: 0, critique: "为了提升那10%的性能，多花100%的钱。除非你是靠这个吃饭的，否则就是在为厂家的财报做慈善。" }
+            ]
+        },
+        {
+            dim: "持有成本",
+            q: "环保负罪感：不想用它时，它会在垃圾场存在几百年。值得吗？",
+            theory: "环境心理学。将消费行为与环境后果挂钩，通过道德压力抑制冲动。",
+            case: "盲盒/扭蛋：塑料制品的快乐仅持续拆开的那几秒，之后是数百年的污染。",
+            options: [
+                { t: "A. 能用很久", s: 5 },
+                { t: "B. 快时尚/塑料", s: 0, critique: "这些廉价的塑料玩具，最终都会变成微塑料回到你的肚子里。少买点垃圾，积点德吧。" }
+            ]
+        }
+    ];
+
+    // === 逻辑控制 ===
+    function startGame() {
+        const salary = document.getElementById('monthlySalary').value;
+        const price = document.getElementById('itemPrice').value;
+        if (!salary || !price) { alert("请填写入门费（月薪和价格）！"); return; }
+        
+        state.laborHours = (price / (salary / 21.75 / 8)).toFixed(1);
+        document.getElementById('screen-setup').classList.remove('active');
+        document.getElementById('screen-quiz').classList.add('active');
+        renderQuestion();
+    }
+
+    function toggleKnowledge() {
+        const content = document.getElementById('knowledge-content');
+        const icon = document.getElementById('toggle-icon');
+        content.classList.toggle('collapsed');
+        
+        // 旋转图标
+        if (content.classList.contains('collapsed')) {
+            icon.style.transform = 'rotate(180deg)';
+        } else {
+            icon.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    function renderQuestion() {
+        const qData = questions[state.currentQ];
+        document.getElementById('dimension-tag').innerText = qData.dim;
+        document.getElementById('current-q-num').innerText = state.currentQ + 1;
+        document.getElementById('progress-bar').style.width = `${(state.currentQ / questions.length) * 100}%`;
+        document.getElementById('question-text').innerText = qData.q;
+        
+        // 渲染详情与案例
+        const kContent = document.getElementById('knowledge-content');
+        kContent.innerHTML = `
+            <div style="margin-bottom:8px;"><strong>📖 理论：</strong>${qData.theory}</div>
+            <div><strong>🔥 案例：</strong><span class="case-tag">Case</span>${qData.case}</div>
+        `;
+        // 确保新题目默认展开 (移除 collapsed 类)
+        kContent.classList.remove('collapsed');
+        document.getElementById('toggle-icon').style.transform = 'rotate(0deg)';
+
+        // 渲染选项
+        const optContainer = document.getElementById('options-container');
+        optContainer.innerHTML = '';
+        qData.options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-option';
+            btn.innerText = opt.t;
+            btn.onclick = () => handleAnswer(opt);
+            optContainer.appendChild(btn);
+        });
+    }
+
+    function handleAnswer(opt) {
+        state.answers.push({ ...questions[state.currentQ], choice: opt.t, score: opt.s, critique: opt.critique });
+        state.score += opt.s;
+
+        if (opt.s === 0 && opt.critique) {
+            // 触发毒舌弹窗
+            showOverlay(opt.critique);
+        } else {
+            // 正向反馈
+            confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 }, colors: ['#10B981', '#34D399'] });
+            nextQuestion();
+        }
+    }
+
+    function showOverlay(text) {
+        document.getElementById('overlay-text').innerText = text;
+        document.getElementById('critique-overlay').classList.add('active');
+        // 手机震动反馈
+        if (navigator.vibrate) navigator.vibrate(200);
+    }
+
+    function closeCritique() {
+        document.getElementById('critique-overlay').classList.remove('active');
+        nextQuestion();
+    }
+
+    function nextQuestion() {
+        state.currentQ++;
+        if (state.currentQ < questions.length) {
+            setTimeout(renderQuestion, 300);
+        } else {
+            endGame();
+        }
+    }
+
+    function endGame() {
+        document.getElementById('screen-quiz').classList.remove('active');
+        document.getElementById('screen-result').classList.add('active');
+        
+        const finalScore = state.score;
+        const scoreEl = document.getElementById('final-score');
+        const verdictEl = document.getElementById('final-verdict');
+        const adviceEl = document.getElementById('final-advice');
+
+        // 跑分动画
+        let temp = 0;
+        const timer = setInterval(() => {
+            temp++;
+            scoreEl.innerText = temp;
+            if (temp >= finalScore) clearInterval(timer);
+            scoreEl.style.color = temp <= 40 ? "var(--danger)" : (temp <= 75 ? "var(--warning)" : "var(--primary)");
+        }, 15);
+
+        if (finalScore <= 40) {
+            verdictEl.innerText = "🛑 智商税警报";
+            verdictEl.style.color = "var(--danger)";
+            adviceEl.innerHTML = "<strong>诊断：</strong> 多巴胺劫持状态。你的大脑现在全是水。<br><strong>处方：</strong> 立即关闭页面！去睡一觉。";
+        } else if (finalScore <= 75) {
+            verdictEl.innerText = "⚠️ 高风险区域";
+            verdictEl.style.color = "var(--warning)";
+            adviceEl.innerHTML = "<strong>诊断：</strong> 存在明显消费陷阱。<br><strong>处方：</strong> 放入购物车‘腌制’30天。建议寻找二手替代。";
+        } else {
+            verdictEl.innerText = "✅ 理性认证通过";
+            verdictEl.style.color = "var(--primary)";
+            adviceEl.innerHTML = "<strong>诊断：</strong> 优质资产。这属于你的能力圈和刚需。<br><strong>处方：</strong> 放心购买，不用愧疚。";
+        }
+    }
+
+    function downloadPDF() {
+        const el = document.getElementById('pdf-content');
+        document.getElementById('pdf-item').innerText = document.getElementById('itemName').value;
+        document.getElementById('pdf-price').innerText = document.getElementById('itemPrice').value;
+        document.getElementById('pdf-labor').innerText = state.laborHours;
+        document.getElementById('pdf-score').innerText = state.score;
+        document.getElementById('pdf-verdict-text').innerText = document.getElementById('final-verdict').innerText;
+        document.getElementById('pdf-advice-text').innerHTML = document.getElementById('final-advice').innerHTML;
+
+        const tbody = document.getElementById('pdf-table-body');
+        tbody.innerHTML = '';
+        state.answers.forEach(row => {
+            const tr = document.createElement('tr');
+            let answerText = `<b>${row.choice}</b>`;
+            if (row.score === 0) answerText += `<br><i style="color:#EF4444; font-size:0.9em;">🤡 ${row.critique}</i>`;
+            tr.innerHTML = `
+                <td style="padding:8px; border-bottom:1px solid #eee;">${row.dim}</td>
+                <td style="padding:8px; border-bottom:1px solid #eee;">${row.q}</td>
+                <td style="padding:8px; border-bottom:1px solid #eee;">${answerText}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        el.classList.add('pdf-visible');
+        html2pdf().from(el).save(`智商税审计_${document.getElementById('itemName').value}.pdf`).then(() => el.classList.remove('pdf-visible'));
+    }
+</script>
+
+</body>
+</html>
